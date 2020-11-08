@@ -1,16 +1,20 @@
-# msu_firebase_example
+# MSU Firebase Example
 
-An example of using Firebase with Flutter.
+Чтобы собрать проект:
 
-## Getting Started
+**Android**
+1. Создать Android-приложение в [Firebase Console](https://console.firebase.google.com/)
+2. Скачать файл google-services.json (один из шагов при создании Android-приложения)
+3. Положить файл google-services.json в директорию `[project]/android/app/`
 
-This project is a starting point for a Flutter application.
+**iOS**
+1. Создать iOS-приложение в [Firebase Console](https://console.firebase.google.com/)
+2. Скачать файл GoogleService-Info.plist (один из шагов при создании iOS-приложения)
+3. Открыть директорию проекта `[project]/ios/` в XCode
+4. Слева выбирать Runner, далее: File → Add Files to Runner
+5. Выбирать файл GoogleService-Info.plist, убедиться что включен пункт: "Copy items if needed"
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
-
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**Web**
+1. Создать Web-приложение в [Firebase Console](https://console.firebase.google.com/)
+2. Скопировать код из шага "Add Firebase SDK"
+3. Добавить скопированный код в `[project]/web/index.html`, заменив комментарий `<!-- Add copied code here -->`

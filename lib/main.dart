@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 void main() => runApp(App());
@@ -19,9 +22,10 @@ class _AppState extends State<App> {
     init();
   }
 
+  /// Метод с начальной инициализацией приложения
   Future<void> init() async {
-    // TODO initialization
-
+    await Firebase.initializeApp();
+    //await PushNotificationsManager().init();
     print('Initialized');
     setState(() => _initialized = true);
   }
@@ -47,7 +51,13 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final CounterLogic _logic = CounterLogic();
+  final countersCollection = FirebaseFirestore.instance.collection('counters');
+
+  Stream<List<Counter>> get updates => countersCollection.snapshots().map(
+      (event) =>
+          event.docs.map((e) => Counter.fromJson(e.id, e.data())).toList()
+            ..sort((c1, c2) => c1.name.compareTo(c2.name)));
+
   final _focus = FocusNode();
   final _controller = TextEditingController();
   bool _editing = false;
@@ -55,7 +65,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _controller.dispose();
-    _logic.dispose();
     super.dispose();
   }
 
@@ -65,10 +74,12 @@ class _HomePageState extends State<HomePage> {
       body: GestureDetector(
         child: SafeArea(
           child: StreamBuilder<List<Counter>>(
-              initialData: _logic.currentCounters,
-              stream: _logic.updates,
+              stream: updates,
               builder: (context, snapshot) {
                 final counters = snapshot.data;
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
                 return ListView.builder(
                     itemBuilder: (context, index) {
                       final counter = counters[index];
@@ -128,14 +139,21 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _addCounter() {
-    _logic.addCounter(_controller.value.text);
+  Future<void> _addCounter() async {
+    final name = _controller.value.text;
+    await countersCollection.add(Counter.jsonCounter(name, 0));
     _stopEdit();
   }
 
-  void _updateCounter(Counter counter, int diff) {
-    _logic.update(counter, diff);
+  Future<void> _updateCounter(Counter counter, int diff) async {
+    await countersCollection
+        .doc(counter.id)
+        .set(Counter.jsonCounter(counter.name, counter.amount + diff));
     setState(() {});
+  }
+
+  Future<void> _deleteCounter(Counter counter) async {
+    await countersCollection.doc(counter.id).delete();
   }
 
   void _startEdit() {
@@ -153,10 +171,6 @@ class _HomePageState extends State<HomePage> {
     setState(() => _editing = false);
     _controller.clear();
     _focus.unfocus();
-  }
-
-  void _deleteCounter(Counter counter) {
-    _logic.deleteCounter(counter);
   }
 }
 
@@ -194,45 +208,43 @@ class _CounterItem extends StatelessWidget {
   }
 }
 
-class CounterLogic {
-  final _controller = StreamController<Map<String, Counter>>.broadcast();
-  final _currentCountersMap = <String, Counter>{};
-
-  List<Counter> get currentCounters => _currentCountersMap.values.toList();
-
-  Stream<List<Counter>> get updates =>
-      _controller.stream.map((counters) => counters.values.toList());
-
-  void addCounter(String name) {
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    _currentCountersMap[id] = Counter(id, name, 0);
-    _emitUpdate();
-  }
-
-  void deleteCounter(Counter counter) {
-    _currentCountersMap.remove(counter.id);
-    _emitUpdate();
-  }
-
-  void update(Counter counter, int diff) {
-    _currentCountersMap[counter.id] =
-        Counter(counter.id, counter.name, counter.amount + diff);
-    _emitUpdate();
-  }
-
-  void dispose() {
-    _controller.close();
-  }
-
-  void _emitUpdate() {
-    _controller.add(_currentCountersMap);
-  }
-}
-
 class Counter {
+  static Map<String, dynamic> jsonCounter(String name, int amount) =>
+      {'name': name, 'amount': amount};
+
   final String id;
   final String name;
   final int amount;
 
   const Counter(this.id, this.name, this.amount);
+
+  factory Counter.fromJson(String id, Map<String, dynamic> json) =>
+      Counter(id, json['name'], json['amount']);
+
+  Map<String, dynamic> toJson() => {'name': name, 'amount': amount};
+}
+
+/// Наша абстракция для работы с push-уведомлениями
+class PushNotificationsManager {
+  PushNotificationsManager._();
+
+  factory PushNotificationsManager() => _instance;
+
+  static final PushNotificationsManager _instance =
+      PushNotificationsManager._();
+
+  bool _initialized = false;
+
+  Future<void> init() async {
+    if (_initialized) {
+      return;
+    }
+    // For iOS only
+    FirebaseMessaging.instance.requestPermission();
+
+    String token = await FirebaseMessaging.instance.getToken();
+    print("Token: $token");
+
+    _initialized = true;
+  }
 }
